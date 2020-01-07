@@ -30,3 +30,17 @@ console.log(showweek);
 // 周一至周二、周四至周五、周日
 ```
 
+## 倒计时同步服务器时间
+```JavaScript
+// 获取最终时间 next和当前系统时间戳
+const {next, system_time} = await ajax();
+// 计算出本地和服务器时间间隔
+const diffDate = +new Date()/1000 - system_time;
+// 定时计算剩余时间戳
+// 本地时间和下一次时间相减再加上与服务器直接的间隔 得到剩余时间戳
+const countdown = next - (new Date()/1000) + diffDate;
+// 进行一些时间格式化
+......
+// 得到结果
+// 01:12:34
+```
