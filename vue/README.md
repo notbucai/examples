@@ -14,3 +14,7 @@
   msg // 具体信息
 }
 ```
+
+## 自动加载全局组件库，不需要重复引用
+
+> 查阅 [globalComponent.js](./globalComponent.js)
