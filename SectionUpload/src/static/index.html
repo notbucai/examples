@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="./index.umd.js"></script>
+  <script src="./axios.min.js"></script>
+  <script src="./async.min.js"></script>
+</head>
+
+<body>
+  <input type="file" onchange="upload(this)" multiple>
+  <script>
+    const BMF = browserMD5File;
+
+    const bmf = new BMF();
+
+    // 生成文件md5
+    function generateFileKey(file, onProgress) {
+      return new Promise((resolve, reject) => {
+        bmf.md5(file, (err, md5) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(md5);
+        }, onProgress);
+      });
+    }
+    // 文件切片 并生成切片相关信息 如切片顺序、md5
+    function fileSlice(file, size, onProgress) {
+      // 根据大小进行切片大小计算
+
+      // 生成单个切片
+      const generateItemBlock = (file, index) => {
+        return new Promise((resolve, reject) => {
+          generateFileKey(file).then(key => {
+            // 切片信息
+            const current = {
+              key, // md5
+              index, // index
+              data: file // 切片数据
+            };
+            resolve(current);
+          }).catch(err => {
+            reject(err);
+          });
+        });
+      }
+
+      const page = Math.ceil(file.size / size);
+      // 初始位置
+      let start = 0;
+      // 等待的异步任务队列
+      const promiseList = [];
+      for (let i = 0; i < page; i++) {
+        // 计算当前切片的终止位置
+        const end = start + size;
+        const item = file.slice(start, end);
+        // 更新 开始位置
+        start = end;
+        // 生成单个块 （异步）
+        const block = generateItemBlock(item, i);
+        // 将异步块放入
+        promiseList.push(block);
+        // 当前进度
+        onProgress && onProgress(block);
+      }
+      // 执行所有异步任务
+      return Promise.all(promiseList);
+    }
+
+    // 上传文件
+    async function uploadFile(file) {
+      // 生成文件md5
+      const key = await generateFileKey(file);
+      // 将文件切片
+      const list = await fileSlice(file, 10 * 1024, async (item) => {
+        console.log('item', await item); // 查看当前进度
+      });
+      console.log('list', list);
+      console.log('key', key);
+
+      // NOTE: 1. 先初始化文件容器 并返回当前文件切片状态（完成/未完成）
+      // 通过文件md5查看 or 初始化 服务器 文件容器
+      const { data } = await axios.post('/fileStatus', {
+        key: key, // md5
+        length: list.length, // 当前文件切片数量
+        name: file.name, // 文件名、用户后续生成最终文件
+      });
+      // 得到当前文件的状态
+      const resData = data.data;
+
+      // NOTE: 2. 选择未完成的切片 上传  
+      const blocks = list.filter(item => {
+        // 过滤已经上传完成的块
+        return !resData.blocks.find(block => item.key == block.key);
+      });
+      
+      // 上传文件块
+      const uploadBlcok = (block) => {
+        const fd = new FormData();
+        fd.append('key', block.key);  // 切片md5
+        fd.append('index', block.index); // 切片下标 用于合并
+        fd.append('file', block.data); // 当前切片数据
+        fd.append('parent', key); // 需要关联父级容器
+        // 上传一个块
+        return axios.post('/uploadBlock', fd);
+      }
+      console.log('blocks=>', blocks.length);
+
+      // 控制异步并发,避免块数量过多失败的时候导致成功数量变少
+      async.mapLimit(blocks, 3, async (file, callback) => {
+        // 调用上传块
+        await uploadBlcok(file);
+        // callback && callback();
+      }, async () => {
+        // 单任务执行完成后获取当前文件状态，可在这里获取文件地址
+        const { data: rData } = await axios.post('/fileStatus', {
+          key: key,
+          length: list.length,
+          name: file.name,
+        });
+        const _resData = rData.data;
+        console.log('_resData', _resData);
+        const img = new Image()
+        img.src = _resData.url;
+        document.documentElement.append(img);
+      });
+    }
+    async function upload(e) {
+      [...e.files].forEach(file => {
+        uploadFile(file)
+      });
+    }
+  </script>
+</body>
+
+</html>

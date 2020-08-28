@@ -1,0 +1,22 @@
+{
+  "name": "file-split-upload",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js -i ./src/db/"
+  },
+  "keywords": [],
+  "author": "不才 <1450941858@qq.com> (http://blog.ncgame.cc/)",
+  "license": "ISC",
+  "dependencies": {
+    "@koa/router": "^9.4.0",
+    "browser-md5-file": "^1.1.1",
+    "koa": "^2.13.0",
+    "koa-body": "^4.2.0",
+    "koa-logger": "^3.2.1",
+    "koa-static": "^5.0.0",
+    "lowdb": "^1.0.0",
+    "nodemon": "^2.0.4"
+  }
+}
